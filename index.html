@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="id"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1B2B4B">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png">
+<title>Kartu Kalimat</title>
+<style>
+:root{--bg:#D9ECF5;--ink:#1B2B4B;--card:#FFFDF7;--gold:#F2B632;--ok:#25A06B;--bad:#E04F4F;box-sizing:border-box}
+*{box-sizing:inherit;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:"Trebuchet MS",system-ui,sans-serif;display:flex;justify-content:center;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+#app{width:100%;max-width:480px;height:100%;display:flex;flex-direction:column;padding:14px;gap:12px;position:relative}
+.hud{display:flex;justify-content:space-between;font-weight:700;font-size:1.05rem}
+.hud[hidden]{display:none}
+.bar{height:8px;background:#fff9;border-radius:4px;overflow:hidden;visibility:hidden}
+.bar i{display:block;height:100%;width:100%;background:var(--gold)}
+.stage{flex:1;display:flex;flex-direction:column;justify-content:center;gap:18px;min-height:0}
+.card{background:var(--card);border:3px solid var(--ink);border-radius:18px;box-shadow:0 5px 0 var(--ink);padding:20px;text-align:center}
+.sent{font-size:1.6rem;line-height:1.4;font-weight:700}
+.q{font-size:1.25rem;font-weight:700}
+.title{font-size:2.2rem;font-weight:800;margin:0}
+.sub{margin:0;opacity:.8}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+button{font:inherit;color:var(--ink);cursor:pointer}
+.ans{font-size:1.05rem;font-weight:700;min-height:92px;display:flex;align-items:center;justify-content:center}
+.ans:active,.btn:active{transform:translateY(3px);box-shadow:0 2px 0 var(--ink)}
+.ans.ok{background:var(--ok);color:#fff}
+.ans.bad{background:var(--bad);color:#fff;animation:sh .35s}
+@keyframes sh{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+.btn{background:var(--gold);font-weight:800;font-size:1.2rem;padding:14px;border:3px solid var(--ink);border-radius:14px;box-shadow:0 5px 0 var(--ink)}
+.link{background:none;border:0;text-decoration:underline;font-size:.95rem;align-self:center;padding:8px}
+.ov{position:absolute;inset:0;background:#1B2B4Bd9;display:flex;flex-direction:column;justify-content:center;gap:18px;padding:20px;z-index:5}
+.ov[hidden]{display:none}
+@media (prefers-reduced-motion:reduce){.ans.bad{animation:none}}
+</style></head><body>
+<div id="app">
+  <div class="hud" id="hud" hidden><span id="lv"></span><span id="sc"></span><span id="lf"></span></div>
+  <div class="bar" id="bar"><i id="fill"></i></div>
+  <div class="stage" id="stage"></div>
+  <div class="ov" id="ov" hidden></div>
+</div>
+<script>
+const D=[
+{kapan:"Pagi hari",siapa:"Alvin",apa:"berangkat",tempat:"ke sekolah",dengan:"naik bis"},
+{kapan:"Siang hari",siapa:"Sari",apa:"pulang",tempat:"dari pasar",dengan:"naik becak"},
+{kapan:"Sore hari",siapa:"Budi",apa:"bermain bola",tempat:"di lapangan",dengan:"memakai sepatu bola"},
+{kapan:"Malam hari",siapa:"Rina",apa:"membaca buku",tempat:"di kamar",dengan:"dengan lampu belajar"},
+{kapan:"Subuh hari",siapa:"Pak Dika",apa:"pergi",tempat:"ke masjid",dengan:"berjalan kaki"},
+{kapan:"Pagi hari",siapa:"Maya",apa:"menyiram bunga",tempat:"di taman",dengan:"dengan selang air"},
+{kapan:"Siang hari",siapa:"Andi",apa:"memotong kertas",tempat:"di kelas",dengan:"dengan gunting"},
+{kapan:"Sore hari",siapa:"Ibu",apa:"memasak nasi",tempat:"di dapur",dengan:"dengan rice cooker"},
+{kapan:"Hari Minggu",siapa:"Dewi",apa:"pergi",tempat:"ke kebun binatang",dengan:"naik kereta"},
+{kapan:"Malam hari",siapa:"Tono",apa:"menonton film",tempat:"di ruang tamu",dengan:"dengan televisi"},
+{kapan:"Pagi hari",siapa:"Nina",apa:"berangkat",tempat:"ke kantor",dengan:"naik motor"},
+{kapan:"Sore hari",siapa:"Eko",apa:"memancing ikan",tempat:"di sungai",dengan:"dengan joran"},
+{kapan:"Siang hari",siapa:"Lia",apa:"menulis surat",tempat:"di perpustakaan",dengan:"dengan pulpen"},
+{kapan:"Hari Sabtu",siapa:"Bayu",apa:"pergi",tempat:"ke pantai",dengan:"naik mobil"},
+{kapan:"Pagi hari",siapa:"Rumi",apa:"berangkat",tempat:"ke sekolah",dengan:"naik sepeda"},
+{kapan:"Siang hari",siapa:"Rubi",apa:"makan siang",tempat:"di kantin",dengan:"dengan sendok"},
+{kapan:"Sore hari",siapa:"Nana",apa:"menyapu halaman",tempat:"di rumah",dengan:"dengan sapu"},
+{kapan:"Malam hari",siapa:"Intan",apa:"menggambar",tempat:"di ruang keluarga",dengan:"dengan pensil warna"},
+{kapan:"Hari Minggu",siapa:"Sumego",apa:"berolahraga",tempat:"di taman kota",dengan:"memakai sepatu lari"},
+{kapan:"Subuh hari",siapa:"Masri",apa:"pergi",tempat:"ke ladang",dengan:"naik traktor"}
+];
+const F=['siapa','kapan','dengan','tempat'],T=25;
+const Q={
+ siapa:s=>`Siapa yang ${s.apa} ${s.tempat}?`,
+ kapan:s=>`Kapan ${s.siapa} ${s.apa} ${s.tempat}?`,
+ dengan:s=>`Dengan apa ${s.siapa} ${s.apa} ${s.tempat}?`,
+ tempat:s=>`${cap(s.tempat.split(' ')[0])} mana ${s.siapa} ${s.apa}?`
+};
+const $=id=>document.getElementById(id);
+const cap=t=>t[0].toUpperCase()+t.slice(1);
+const sh=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
+const text=s=>`${s.kapan}, ${s.siapa} ${s.apa} ${s.tempat} ${s.dengan}.`;
+const getHS=()=>{try{return +localStorage.getItem('kk_hs')||0}catch(e){return 0}};
+const setHS=v=>{try{localStorage.setItem('kk_hs',v)}catch(e){}};
+let st,left,tm,lock,paused,ac;
+
+function tone(f,t,d,type='sine'){try{ac=ac||new(window.AudioContext||window.webkitAudioContext)();const o=ac.createOscillator(),g=ac.createGain();o.type=type;o.frequency.value=f;g.gain.setValueAtTime(.2,ac.currentTime+t);g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+t+d);o.connect(g);g.connect(ac.destination);o.start(ac.currentTime+t);o.stop(ac.currentTime+t+d)}catch(e){}}
+const beep=ok=>ok?(tone(660,0,.12),tone(880,.12,.18)):tone(180,0,.3,'sawtooth');
+const vib=p=>{try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}};
+
+function hud(){
+ $('hud').hidden=false;
+ $('lv').textContent=`Level ${st.round<4?1:2}`;
+ $('sc').textContent=`Skor ${st.score}`;
+ $('lf').textContent='♥'.repeat(Math.max(st.lives,0))+'♡'.repeat(3-Math.max(st.lives,0));
+}
+function home(){
+ clearInterval(tm);$('hud').hidden=true;$('bar').style.visibility='hidden';
+ $('stage').innerHTML=`<div class="card"><h1 class="title">Kartu Kalimat</h1><p class="sub">Baca kalimat, ingat, lalu jawab pertanyaannya.</p><p class="sub">Skor tertinggi: <b>${getHS()}</b></p></div><button class="btn" id="go">Main</button>`;
+ $('go').onclick=start;
+}
+function start(){
+ st={lives:3,score:0,round:0,order:sh(D),qs:[],qi:0};
+ read();
+}
+function cur(){return st.order[st.round%D.length]}
+function read(){
+ if(st.round>0&&st.round%D.length===0)st.order=sh(D);
+ clearInterval(tm);$('bar').style.visibility='hidden';hud();
+ $('stage').innerHTML=`<p class="sub" style="text-align:center">Kalimat ${st.round+1}. Baca baik-baik.</p><div class="card"><div class="sent">${text(cur())}</div></div><button class="btn" id="ready">Siap</button>`;
+ $('ready').onclick=()=>{
+  const s=cur(),n=st.round<4?3:4;
+  st.qs=sh(F).slice(0,n).map(f=>{const ok=s[f];return{t:Q[f](s),ok,a:sh([ok,...sh([...new Set(D.map(d=>d[f]))].filter(v=>v!==ok)).slice(0,3)])}});
+  st.qi=0;ask();
+ };
+}
+function ask(){
+ const q=st.qs[st.qi];lock=false;paused=false;left=T;hud();
+ $('bar').style.visibility='visible';$('fill').style.width='100%';
+ $('stage').innerHTML=`<p class="sub" style="text-align:center">Pertanyaan ${st.qi+1} dari ${st.qs.length}</p><div class="card q">${q.t}</div><div class="grid">${q.a.map((a,i)=>`<button class="card ans" data-i="${i}">${cap(a)}</button>`).join('')}</div><button class="link" id="peek">Lihat lagi (−1 poin)</button>`;
+ document.querySelectorAll('.ans').forEach(b=>b.onclick=()=>pick(+b.dataset.i));
+ $('peek').onclick=peek;
+ clearInterval(tm);
+ tm=setInterval(()=>{if(paused)return;left-=.1;$('fill').style.width=Math.max(left/T*100,0)+'%';if(left<=0)pick(-1)},100);
+}
+function peek(){
+ if(lock)return;paused=true;st.score=Math.max(0,st.score-1);hud();
+ $('ov').hidden=false;
+ $('ov').innerHTML=`<div class="card"><div class="sent">${text(cur())}</div></div><button class="btn" id="back">Lanjut</button>`;
+ $('back').onclick=()=>{$('ov').hidden=true;paused=false};
+}
+function pick(i){
+ if(lock)return;lock=true;clearInterval(tm);
+ const q=st.qs[st.qi],good=i>=0&&q.a[i]===q.ok,bs=[...document.querySelectorAll('.ans')];
+ bs.forEach((b,k)=>{if(q.a[k]===q.ok)b.classList.add('ok')});
+ if(good){st.score+=10+Math.round(10*left/T);beep(true);vib(40)}
+ else{st.lives--;if(i>=0)bs[i].classList.add('bad');beep(false);vib([80,40,80])}
+ hud();
+ setTimeout(()=>{
+  if(st.lives<=0)return over();
+  st.qi++;
+  if(st.qi<st.qs.length)ask();else{st.round++;read()}
+ },1100);
+}
+function over(){
+ clearInterval(tm);$('bar').style.visibility='hidden';
+ const best=getHS(),rec=st.score>best;if(rec)setHS(st.score);
+ $('stage').innerHTML=`<div class="card"><h1 class="title">Game selesai</h1><p class="sub">Skor kamu <b>${st.score}</b> dari ${st.round} kalimat</p><p class="sub">${rec?'Rekor baru!':'Skor tertinggi: '+best}</p></div><button class="btn" id="again">Main lagi</button>`;
+ $('again').onclick=start;
+}
+home();
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script></body></html>
